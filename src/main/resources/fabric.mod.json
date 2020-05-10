@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "extratags",
   "version": "${version}",
 
-  "name": "Example Mod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "name": "Extra Tags",
+  "description": "Tags but they apply to more objects",
   "authors": [
     "Tfarecnim"
   ],
@@ -17,12 +17,12 @@
 
   "environment": "*",
   "entrypoints": {
-    "main": [
-      "tfar.example.ExampleMod"
+    "client": [
+      "tfar.extratags.ExtraTags"
     ]
   },
   "mixins": [
-    "modid.mixins.json"
+    "extratags.mixins.json"
   ],
 
   "depends": {
