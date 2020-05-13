@@ -3,8 +3,6 @@
   "package": "tfar.extratags.mixin",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
-  ],
-  "client": [
     "PlayerManagerMixin",
     "MinecraftServerMixin"
   ],
