@@ -1,10 +1,8 @@
 package tfar.extratags;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.network.ClientSidePacketRegistry;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.registry.Registry;
 import tfar.extratags.api.ExtraTagManager;
 import tfar.extratags.api.tagtypes.BiomeTags;
 import tfar.extratags.api.tagtypes.BlockEntityTypeTags;

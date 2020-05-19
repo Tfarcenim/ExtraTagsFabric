@@ -12,8 +12,8 @@ import tfar.extratags.Hooks;
 
 @Mixin(PlayerManager.class)
 abstract class PlayerManagerMixin implements ServerLoginPacketListener {
-		@Inject(method = "onPlayerConnect", at = @At("RETURN"))
-		public void onPlayerLogin(ClientConnection connection, ServerPlayerEntity player, CallbackInfo info) {
-			Hooks.onPlayerLogin(connection, player, info);
-		}
+	@Inject(method = "onPlayerConnect", at = @At("RETURN"))
+	public void onPlayerLogin(ClientConnection connection, ServerPlayerEntity player, CallbackInfo info) {
+		Hooks.onPlayerLogin(connection, player, info);
+	}
 }
