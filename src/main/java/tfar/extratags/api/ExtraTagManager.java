@@ -25,15 +25,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
-public class ExtraTagManager implements ResourceReloadListener {
-	private final List<RegistryTagContainer> tagCollections = new ArrayList();
+public class ExtraTagManager<T> implements ResourceReloadListener {
+	private final List<RegistryTagContainer<T>> tagCollections = new ArrayList<>();
 
 	public ExtraTagManager() {
-		RegistryTagContainer<Biome> biomes = new RegistryTagContainer(Registry.BIOME, "tags/biomes", "biome");
+		RegistryTagContainer<Biome> biomes = new RegistryTagContainer<>(Registry.BIOME, "tags/biomes", "biome");
 		this.tagCollections.add(biomes);
-		RegistryTagContainer<BlockEntityType<?>> block_entity_types = new RegistryTagContainer(Registry.BLOCK_ENTITY_TYPE, "tags/block_entity_types", "block_entity_type");
+		RegistryTagContainer<BlockEntityType<?>> block_entity_types = new RegistryTagContainer<>(Registry.BLOCK_ENTITY_TYPE, "tags/block_entity_types", "block_entity_type");
 		this.tagCollections.add(block_entity_types);
-		RegistryTagContainer<Enchantment> enchantments = new RegistryTagContainer(Registry.ENCHANTMENT, "tags/enchantments", "enchantment");
+		RegistryTagContainer<Enchantment> enchantments = new RegistryTagContainer<>(Registry.ENCHANTMENT, "tags/enchantments", "enchantment");
 		this.tagCollections.add(enchantments);
 	}
 
@@ -43,8 +43,8 @@ public class ExtraTagManager implements ResourceReloadListener {
 		});
 	}
 
-	public static ExtraTagManager read(PacketByteBuf buffer) {
-		ExtraTagManager tagManager = new ExtraTagManager();
+	public static ExtraTagManager<?> read(PacketByteBuf buffer) {
+		ExtraTagManager<?> tagManager = new ExtraTagManager<>();
 		tagManager.tagCollections.forEach((tagCollection) -> {
 			tagCollection.fromPacket(buffer);
 		});
@@ -53,33 +53,32 @@ public class ExtraTagManager implements ResourceReloadListener {
 
 	public CompletableFuture<Void> reload(Synchronizer synchronizer, ResourceManager manager, Profiler preparationsProfiler, Profiler reloadProfiler, Executor prepareExecutor, Executor applyExecutor) {
 		List<CompletableFuture<Map<Identifier, Tag.Builder>>> completableFutureList = new ArrayList();
-		Iterator var8 = this.tagCollections.iterator();
 
-		while(var8.hasNext()) {
-			RegistryTagContainer<?> registryTagContainer = (RegistryTagContainer)var8.next();
+		for (RegistryTagContainer<T> tagCollection : this.tagCollections) {
+			RegistryTagContainer<?> registryTagContainer = tagCollection;
 			completableFutureList.add(registryTagContainer.prepareReload(manager, prepareExecutor));
 		}
 
-		CompletableFuture<Void> completableFutureVoid = CompletableFuture.allOf((CompletableFuture[])completableFutureList.toArray(new CompletableFuture[0]));
+		CompletableFuture<Void> completableFutureVoid = CompletableFuture.allOf(completableFutureList.toArray(new CompletableFuture[0]));
 		synchronizer.getClass();
 		return completableFutureVoid.thenCompose(synchronizer::whenPrepared).thenAcceptAsync((void_) -> {
 			for(int ix = 0; ix < this.tagCollections.size(); ++ix) {
-				RegistryTagContainer registryTagContainer = (RegistryTagContainer)this.tagCollections.get(ix);
-				registryTagContainer.applyReload((Map)((CompletableFuture)completableFutureList.get(ix)).join());
+				RegistryTagContainer registryTagContainer = this.tagCollections.get(ix);
+				registryTagContainer.applyReload(completableFutureList.get(ix).join());
 			}
 
 			ExtraTagsContainers.setHolder(this.tagCollections);
 			Multimap<String, Identifier> multimap = HashMultimap.create();
 
 			for(int i = 0; i < this.tagCollections.size(); ++i) {
-				RegistryTagContainer registryTagContainerx = (RegistryTagContainer)this.tagCollections.get(i);
+				RegistryTagContainer registryTagContainerx = this.tagCollections.get(i);
 				String entryType = ((TagContainerAccessor)registryTagContainerx).getEntryType();
-				multimap.putAll(entryType, ((ModTag)ExtraTagRegistry.tagTypeList.get(i)).set(registryTagContainerx));
+				multimap.putAll(entryType, ExtraTagRegistry.tagTypeList.get(i).set(registryTagContainerx));
 			}
 
 			if (!multimap.isEmpty()) {
-				throw new IllegalStateException("Missing required tags: " + (String)multimap.entries().stream().map((entry) -> {
-					return (String)entry.getKey() + ":" + entry.getValue();
+				throw new IllegalStateException("Missing required tags: " + multimap.entries().stream().map((entry) -> {
+					return entry.getKey() + ":" + entry.getValue();
 				}).sorted().collect(Collectors.joining(",")));
 			}
 		}, applyExecutor);
@@ -87,8 +86,8 @@ public class ExtraTagManager implements ResourceReloadListener {
 
 	public void sync() {
 		for(int i = 0; i < this.tagCollections.size(); ++i) {
-			ModTag<?> modTag = (ModTag)ExtraTagRegistry.tagTypeList.get(i);
-			modTag.setContainer((TagContainer)this.tagCollections.get(i));
+			ModTag<?> modTag = ExtraTagRegistry.tagTypeList.get(i);
+			modTag.setContainer(this.tagCollections.get(i));
 		}
 
 	}
