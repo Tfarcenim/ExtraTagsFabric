@@ -1,115 +1,95 @@
 package tfar.extratags.api;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.enchantment.Enchantment;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.resource.ResourceReloadListener;
 import net.minecraft.tag.RegistryTagContainer;
 import net.minecraft.tag.Tag;
 import net.minecraft.tag.TagContainer;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.PacketByteBuf;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.world.biome.Biome;
-import net.minecraft.world.dimension.DimensionType;
+import tfar.extratags.ExtraTagsContainers;
+import tfar.extratags.mixin.TagContainerAccessor;
+
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
-
-import static tfar.extratags.api.ExtraTagRegistry.*;
+import java.util.stream.Collectors;
 
 public class ExtraTagManager implements ResourceReloadListener {
-
-	private final RegistryTagContainer<Enchantment> enchantments = new RegistryTagContainer<>(Registry.ENCHANTMENT, "tags/enchantments", "enchantment");
-	private final RegistryTagContainer<BlockEntityType<?>> block_entity_types = new RegistryTagContainer<>(Registry.BLOCK_ENTITY_TYPE, "tags/block_entity_types", "block_entity_type");
-	private final RegistryTagContainer<Biome> biomes = new RegistryTagContainer<>(Registry.BIOME, "tags/biomes", "biome");
-	private final RegistryTagContainer<DimensionType> dimension_types = new RegistryTagContainer<>(Registry.DIMENSION_TYPE, "tags/dimension_types", "dimension_types");
-
-	public RegistryTagContainer<Enchantment> getEnchantments() {
-		return this.enchantments;
-	}
-
-	public RegistryTagContainer<BlockEntityType<?>> getBlockEntityTypes() {
-		return this.block_entity_types;
-	}
-
-	public RegistryTagContainer<Biome> getBiomes() {
-		return this.biomes;
-	}
-
-	public RegistryTagContainer<DimensionType> getDimensionTypes() {
-		return this.dimension_types;
-	}
-
-	private final Map<RegistryTagContainer, Consumer<TagContainer>> tagCollections = new LinkedHashMap<>();
+	private final List<RegistryTagContainer> tagCollections = new ArrayList();
 
 	public ExtraTagManager() {
-		RegistryTagContainer<Enchantment> enchantments = new RegistryTagContainer<>(Registry.ENCHANTMENT, "tags/enchantments", "enchantment");
-		tagCollections.put(enchantments, ENCHANTMENT::setContainer);
-		RegistryTagContainer<BlockEntityType<?>> block_entity_types = new RegistryTagContainer<>(Registry.BLOCK_ENTITY_TYPE, "tags/block_entity_types", "block_entity_type");
-		tagCollections.put(block_entity_types, BLOCK_ENTITY_TYPE::setContainer);
-		RegistryTagContainer<Biome> biomes = new RegistryTagContainer<>(Registry.BIOME, "tags/biomes", "biome");
-		tagCollections.put(biomes, BIOME::setContainer);
-		RegistryTagContainer<DimensionType> dimension_types = new RegistryTagContainer<>(Registry.DIMENSION_TYPE, "tags/dimension_types", "dimension_types");
-		tagCollections.put(dimension_types, DIMENSION_TYPE::setContainer);
+		RegistryTagContainer<Biome> biomes = new RegistryTagContainer(Registry.BIOME, "tags/biomes", "biome");
+		this.tagCollections.add(biomes);
+		RegistryTagContainer<BlockEntityType<?>> block_entity_types = new RegistryTagContainer(Registry.BLOCK_ENTITY_TYPE, "tags/block_entity_types", "block_entity_type");
+		this.tagCollections.add(block_entity_types);
+		RegistryTagContainer<Enchantment> enchantments = new RegistryTagContainer(Registry.ENCHANTMENT, "tags/enchantments", "enchantment");
+		this.tagCollections.add(enchantments);
 	}
 
 	public void write(PacketByteBuf buffer) {
-		tagCollections.forEach(((RegistryTagContainer, tagCollectionConsumer) -> RegistryTagContainer.toPacket(buffer)));
+		this.tagCollections.forEach((registryTagContainer) -> {
+			registryTagContainer.toPacket(buffer);
+		});
 	}
 
 	public static ExtraTagManager read(PacketByteBuf buffer) {
 		ExtraTagManager tagManager = new ExtraTagManager();
-
-		tagManager.tagCollections.forEach((tagCollection, tagCollectionConsumer) -> tagCollection.fromPacket(buffer));
+		tagManager.tagCollections.forEach((tagCollection) -> {
+			tagCollection.fromPacket(buffer);
+		});
 		return tagManager;
 	}
 
-	public void setContainers() {
-		tagCollections.forEach((RegistryTagContainer, consumer) -> consumer.accept(RegistryTagContainer));
-	}
+	public CompletableFuture<Void> reload(Synchronizer synchronizer, ResourceManager manager, Profiler preparationsProfiler, Profiler reloadProfiler, Executor prepareExecutor, Executor applyExecutor) {
+		List<CompletableFuture<Map<Identifier, Tag.Builder>>> completableFutureList = new ArrayList();
+		Iterator var8 = this.tagCollections.iterator();
 
-	@Override
-	public CompletableFuture<Void> reload(ResourceReloadListener.Synchronizer synchronizer, ResourceManager resourceManager, Profiler preparationsProfiler, Profiler reloadProfiler, Executor backgroundExecutor, Executor gameExecutor)
-																				 {
-		CompletableFuture<List<TagInfo<?>>> reloadResults = CompletableFuture.completedFuture(new ArrayList<>());
-		for (Map.Entry<RegistryTagContainer,Consumer<TagContainer>> tagCollection : tagCollections.entrySet()) {
-			reloadResults = combine(reloadResults, tagCollection.getKey(), resourceManager, backgroundExecutor,tagCollection.getValue());
-		}
-		return reloadResults.thenCompose(synchronizer::whenPrepared).thenAcceptAsync(results -> {
-			results.forEach(TagInfo::applyAndSet);
-
-		}, gameExecutor);
-	}
-
-	private CompletableFuture<List<TagInfo<?>>> combine(CompletableFuture<List<TagInfo<?>>> reloadResults,
-																											RegistryTagContainer<?> tagCollection, ResourceManager resourceManager, Executor backgroundExecutor,Consumer<TagContainer> consumer) {
-		return reloadResults.thenCombine(tagCollection.prepareReload(resourceManager, backgroundExecutor), (results, result) -> {
-			results.add(new TagInfo(tagCollection, result, consumer));
-			return results;
-		});
-	}
-
-	public static class TagInfo<T> {
-
-		private final RegistryTagContainer<T> tagCollection;
-		final Map<Identifier, Tag.Builder<T>> results;
-		final Consumer<TagContainer<?>> consumer;
-
-		private TagInfo(RegistryTagContainer<T> tagCollection, Map<Identifier, Tag.Builder<T>> result, Consumer<TagContainer<?>> consumer) {
-			this.tagCollection = tagCollection;
-			this.results = result;
-			this.consumer = consumer;
+		while(var8.hasNext()) {
+			RegistryTagContainer<?> registryTagContainer = (RegistryTagContainer)var8.next();
+			completableFutureList.add(registryTagContainer.prepareReload(manager, prepareExecutor));
 		}
 
-		private void applyAndSet() {
-			tagCollection.applyReload(results);
-			consumer.accept(tagCollection);
+		CompletableFuture<Void> completableFutureVoid = CompletableFuture.allOf((CompletableFuture[])completableFutureList.toArray(new CompletableFuture[0]));
+		synchronizer.getClass();
+		return completableFutureVoid.thenCompose(synchronizer::whenPrepared).thenAcceptAsync((void_) -> {
+			for(int ix = 0; ix < this.tagCollections.size(); ++ix) {
+				RegistryTagContainer registryTagContainer = (RegistryTagContainer)this.tagCollections.get(ix);
+				registryTagContainer.applyReload((Map)((CompletableFuture)completableFutureList.get(ix)).join());
+			}
+
+			ExtraTagsContainers.setHolder(this.tagCollections);
+			Multimap<String, Identifier> multimap = HashMultimap.create();
+
+			for(int i = 0; i < this.tagCollections.size(); ++i) {
+				RegistryTagContainer registryTagContainerx = (RegistryTagContainer)this.tagCollections.get(i);
+				String entryType = ((TagContainerAccessor)registryTagContainerx).getEntryType();
+				multimap.putAll(entryType, ((ModTag)ExtraTagRegistry.tagTypeList.get(i)).set(registryTagContainerx));
+			}
+
+			if (!multimap.isEmpty()) {
+				throw new IllegalStateException("Missing required tags: " + (String)multimap.entries().stream().map((entry) -> {
+					return (String)entry.getKey() + ":" + entry.getValue();
+				}).sorted().collect(Collectors.joining(",")));
+			}
+		}, applyExecutor);
+	}
+
+	public void sync() {
+		for(int i = 0; i < this.tagCollections.size(); ++i) {
+			ModTag<?> modTag = (ModTag)ExtraTagRegistry.tagTypeList.get(i);
+			modTag.setContainer((TagContainer)this.tagCollections.get(i));
 		}
+
 	}
 }

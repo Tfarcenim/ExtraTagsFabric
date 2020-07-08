@@ -3,8 +3,9 @@
   "package": "tfar.extratags.mixin",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
-    "PlayerManagerMixin",
-    "MinecraftServerMixin"
+    "ClientNetPlayManagerMixin",
+    "TagContainerAccessor",
+    "ServerResourceManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
