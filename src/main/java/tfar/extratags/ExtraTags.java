@@ -33,7 +33,7 @@ public class ExtraTags implements ClientModInitializer {
 			ExtraTagManager extraTagManager = ExtraTagManager.read(attachedData);
 							packetContext.getTaskQueue().execute(() -> {
 								instance.extraTagManager = extraTagManager;
-								instance.extraTagManager.setContainers();
+								instance.extraTagManager.sync();
 							});
 						});
 

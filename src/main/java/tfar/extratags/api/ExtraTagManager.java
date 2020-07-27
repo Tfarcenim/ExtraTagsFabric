@@ -18,15 +18,14 @@ import tfar.extratags.ExtraTagsContainers;
 import tfar.extratags.mixin.TagContainerAccessor;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
-public class ExtraTagManager<T> implements ResourceReloadListener {
-	private final List<RegistryTagContainer<T>> tagCollections = new ArrayList<>();
+public class ExtraTagManager implements ResourceReloadListener {
+	private final List<RegistryTagContainer<?>> tagCollections = new ArrayList<>();
 
 	public ExtraTagManager() {
 		RegistryTagContainer<Biome> biomes = new RegistryTagContainer<>(Registry.BIOME, "tags/biomes", "biome");
@@ -43,8 +42,8 @@ public class ExtraTagManager<T> implements ResourceReloadListener {
 		});
 	}
 
-	public static ExtraTagManager<?> read(PacketByteBuf buffer) {
-		ExtraTagManager<?> tagManager = new ExtraTagManager<>();
+	public static ExtraTagManager read(PacketByteBuf buffer) {
+		ExtraTagManager tagManager = new ExtraTagManager();
 		tagManager.tagCollections.forEach((tagCollection) -> {
 			tagCollection.fromPacket(buffer);
 		});
@@ -52,18 +51,16 @@ public class ExtraTagManager<T> implements ResourceReloadListener {
 	}
 
 	public CompletableFuture<Void> reload(Synchronizer synchronizer, ResourceManager manager, Profiler preparationsProfiler, Profiler reloadProfiler, Executor prepareExecutor, Executor applyExecutor) {
-		List<CompletableFuture<Map<Identifier, Tag.Builder>>> completableFutureList = new ArrayList();
+		List<CompletableFuture<Map<Identifier, Tag.Builder>>> completableFutureList = new ArrayList<>();
 
-		for (RegistryTagContainer<T> tagCollection : this.tagCollections) {
-			RegistryTagContainer<?> registryTagContainer = tagCollection;
-			completableFutureList.add(registryTagContainer.prepareReload(manager, prepareExecutor));
+		for (RegistryTagContainer<?> tagCollection : this.tagCollections) {
+			completableFutureList.add(tagCollection.prepareReload(manager, prepareExecutor));
 		}
 
 		CompletableFuture<Void> completableFutureVoid = CompletableFuture.allOf(completableFutureList.toArray(new CompletableFuture[0]));
-		synchronizer.getClass();
 		return completableFutureVoid.thenCompose(synchronizer::whenPrepared).thenAcceptAsync((void_) -> {
 			for(int ix = 0; ix < this.tagCollections.size(); ++ix) {
-				RegistryTagContainer registryTagContainer = this.tagCollections.get(ix);
+				RegistryTagContainer<?> registryTagContainer = this.tagCollections.get(ix);
 				registryTagContainer.applyReload(completableFutureList.get(ix).join());
 			}
 
@@ -86,7 +83,7 @@ public class ExtraTagManager<T> implements ResourceReloadListener {
 
 	public void sync() {
 		for(int i = 0; i < this.tagCollections.size(); ++i) {
-			ModTag<?> modTag = ExtraTagRegistry.tagTypeList.get(i);
+			ModTag modTag = ExtraTagRegistry.tagTypeList.get(i);
 			modTag.setContainer(this.tagCollections.get(i));
 		}
 

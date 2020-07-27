@@ -6,7 +6,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.tag.Tag;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.biome.Biome;
-import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.world.gen.feature.Feature;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +15,7 @@ public class ExtraTagRegistry {
 	public static final ModTag<Biome> BIOME = new ModTag<>();
 	public static final ModTag<BlockEntityType<?>> BLOCK_ENTITY_TYPE = new ModTag<>();
 	public static final ModTag<Enchantment> ENCHANTMENT = new ModTag<>();
+	public static final ModTag<Feature<?>> FEATURE = new ModTag<>();
 	public static final List<ModTag<?>> tagTypeList = new ArrayList<>();
 
 	public ExtraTagRegistry() {
@@ -32,6 +33,10 @@ public class ExtraTagRegistry {
 		return ENCHANTMENT.register(identifier);
 	}
 
+	public static Tag<Feature<?>> feature(String identifier) {
+		return FEATURE.register(identifier);
+	}
+
 	public static <T> Tag<T> create(String identifier, ModTag<T> tags) {
 		return tags.register(identifier);
 	}
@@ -40,6 +45,7 @@ public class ExtraTagRegistry {
 		tagTypeList.add(BIOME);
 		tagTypeList.add(BLOCK_ENTITY_TYPE);
 		tagTypeList.add(ENCHANTMENT);
+		tagTypeList.add(FEATURE);
 	}
 
 	public static class Delayed {
@@ -56,6 +62,10 @@ public class ExtraTagRegistry {
 
 		public static Tag<Enchantment> enchantment(Identifier id) {
 			return TagRegistry.create(id, ExtraTagRegistry.ENCHANTMENT::getContainer);
+		}
+
+		public static Tag<Feature<?>> feature(Identifier id) {
+			return TagRegistry.create(id, FEATURE::getContainer);
 		}
 	}
 }
